@@ -1,52 +1,86 @@
 # Inventory Management & Hold Service
 
-This repository contains a .NET 10 Web API and background worker that manages inventory reservations, holds, and event publishing (outbox pattern). It includes MongoDB for persistence, Redis for caching, and RabbitMQ for event dissemination.
+This repository contains a set of .NET services and a small web UI that manage inventory, reservations (holds), and event publishing using an outbox pattern. The system uses MongoDB for persistence, Redis for caching, and RabbitMQ for event delivery.
 
-## Quick Start (Local Run)
+Prerequisites
+- [.NET 10 SDK](https://dotnet.microsoft.com/download)
+- Docker & Docker Compose (for backing services)
+- Node.js / npm (optional — to run the web UI)
 
-To run the application, make sure you have the [.NET 10 SDK](https://dotnet.microsoft.com/download) installed.
+Quick start (local)
 
-### 1. Running Backing Services (MongoDB, Redis, RabbitMQ)
-Use Docker Compose to run the required infrastructure services:
+1) Start backing services (Mongo, Redis, RabbitMQ):
+
 ```bash
-docker-compose up -d mongo redis rabbitmq
+docker compose up -d mongo redis rabbitmq
 ```
 
-### 2. Run the Web API
-To run the main Web API locally:
-```bash
-dotnet run --project src/InventoryHold.WebApi/InventoryHold.WebApi.csproj
-```
-The API will start up on `http://localhost:5001`.
+2) Run the API(s) locally
 
-### 3. Run Unit Tests
-To execute NUnit/xUnit tests:
+- Inventory API (main read/management surface):
+
 ```bash
-dotnet test src/InventoryHold.UnitTests/InventoryHold.UnitTests.csproj
+dotnet run --project src/InventoryApi --urls http://localhost:5001
 ```
 
----
+- Inventory Hold API (holds + background workers):
 
-## Run with Docker Compose (Full Stack)
-
-You can launch the entire stack (API + backing services) using Docker Compose:
 ```bash
-docker-compose up --build
+# set MONGO_CONN for local Mongo if needed
+MONGO_CONN="mongodb://admin:admin@localhost:27017/?authSource=admin" \
+  dotnet run --project src/InventoryHold.WebApi --urls http://localhost:5002
 ```
-This builds the `inventoryhold-webapi` container and coordinates startup:
-- Backing services (`mongo`, `redis`, `rabbitmq`) are started first.
-- The API container waits until all backing services are fully healthy before launching.
 
----
+3) Run unit tests
 
-## Cache configuration (InventoryHold)
+```bash
+dotnet test src/InventoryHold.UnitTests
+```
 
-The service relies on Redis for high-performance read paths and precise cache invalidation.
+4) (Optional) Web UI for manual testing
 
-- **Configuring Redis**: Specify the connection string in the `Redis:ConnectionString` configuration block or by setting the `REDIS_CONN` environment variable (e.g. `localhost:6379`).
-- **Cache Enforcement Policy**:
-  - In **Development** mode (`ASPNETCORE_ENVIRONMENT=Development`): If Redis is not configured, the application falls back to a process-local `InMemoryCache` and logs a loud warning. This allows developers to run tests and mock behaviors without local Redis overhead.
-  - In **Production / Staging** environments: Redis is strictly required. The application will **fail-fast and throw an exception** on startup if Redis configuration is missing, preventing cache state inconsistencies.
-- **Dynamic Caching**: Caching for the inventory list is parameter-aware to prevent incorrect cache-hits on filtered listings:
-  - Cache Key: `inventory:list:sku={sku}:loc={location}:avail={availableOnly}`
-  - Hold and release operations register cache key dependencies against target SKUs in Redis sets to facilitate targeted invalidations when quantities shift.
+```bash
+cd src/InventoryHold.WebApp
+npm install
+npm run dev
+```
+
+Run full stack with Docker Compose
+
+To build and run the API alongside backing services:
+
+```bash
+docker compose up --build
+```
+
+Environment variables & configuration notes
+- `MONGO_CONN`: Mongo connection string used by the hold service during local runs.
+- `REDIS_CONN` (or `Redis:ConnectionString` in config): Redis endpoint for caching.
+- Other service-specific settings are available in each project's `appsettings.json` and can be overridden with environment variables.
+
+Caching behavior (developer notes)
+- In development, if Redis is not provided the project includes an `InMemoryCache` implementation to preserve behavior for local testing.
+- In production the system expects a real Redis instance; the application may fail-fast if Redis is required but not configured.
+
+Troubleshooting
+- If a service fails to start, inspect service logs:
+
+```bash
+docker compose logs --no-log-prefix --tail=200 <service>
+```
+
+- Common quick checks:
+  - `docker compose ps` — confirm backing services are up
+  - `curl -sS http://localhost:5001/api/inventory | jq .` — quick inventory smoke-test
+
+Contributing & AI usage
+- This repo includes `AI-USAGE.md` with a short audit explaining how AI tools were used while developing tests and small patches. Keep AI use documented: sanitize prompts and never commit secrets.
+
+Appendix — important paths
+- API projects: `src/InventoryApi`, `src/InventoryHold.WebApi`
+- Domain: `src/InventoryHold.Domain`
+- Infrastructure / hosted services: `src/InventoryHold.Infrastructure`
+- Tests: `src/InventoryHold.UnitTests`
+- Web UI: `src/InventoryHold.WebApp`
+
+Last updated: 2026-06-07 — edited for clarity and developer ergonomics.

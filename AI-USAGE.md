@@ -36,24 +36,7 @@ Where judgement improved on AI output:
   - Static review: read the generated code and compared it to interfaces in `Repositories/` and models in `Models/` to ensure correct usage.
   - Run unit tests locally: I executed:
 
-```bash
-cd src/InventoryHold.UnitTests
-# AI Usage & Audit
-
-Purpose
-
-This document explains how AI coding tools were used while implementing and testing the Inventory Hold project. It documents the AI strategy, examples of accepted and rejected suggestions, verification steps, and practical guardrails. The goal is to provide a clear, human-readable audit trail of AI-assisted work.
-
-## 1) AI Strategy
-
-- **Tools used:** interactive, code-capable LLM (for design suggestions, small patches, and test scaffolding) plus local developer tools: the IDE, `dotnet` CLI, and `docker compose` for Mongo.
-- **Scope & context shared with the AI:** I preferred minimal, targeted context over full-repo dumps. Typical context included the small set of relevant types and method signatures (for example, `HoldService.cs`, `IHoldRepository.cs`, `Hold.cs`) and a one-line intent.
-- **Prompt conventions I followed:**
-  - One-line intent at the top.
-  - Paste only the smallest meaningful code snippets (method signatures, small classes, or interface contracts).
-  - Ask for a single, small deliverable (one patch, one test file, or a single helper function) and request a short explanation for non-trivial choices.
-  - Ask for alternatives when trade-offs existed (e.g., eventual vs strong consistency for holds).
-- **Context management:** for multi-file changes I provided a short file map (file name → responsibility) rather than full files, and I always redacted secrets before sending anything.
+`
 
 ## 2) Human audit: accepted vs rejected suggestions
 
@@ -103,25 +86,4 @@ curl -sS http://localhost:5001/api/inventory | jq .
 - Prefer small, incremental patches and require human review before merging.
 - Keep test and local implementations behaviorally similar to production (e.g., Redis ↔ `InMemoryCache`).
 
-## 5) Practical prompts (sanitized examples)
 
-- Intent: Add a unit test for `HoldService` that asserts expired holds are released and an outbox entry is created. Context: provide `HoldService.CreateHold(...)` signature and `IOutboxRepository` interface. Deliverable: one xUnit test file following project style.
-- Intent: Propose a retry wrapper for transient exceptions in `OutboxDispatcher`. Requirements: exponential backoff, 3 attempts max, log each failure.
-
-If you want the exact prompts and raw AI outputs for auditing, I can add them to an `AI-EXAMPLES/` folder after removing any sensitive data.
-
-## 6) Recommendations / next steps
-
-- Continue to use AI for scaffolding, tests, and small refactors, but keep human review mandatory.
-- Add automated integration tests for the outbox → message bus path to reduce manual validation.
-- Add an `AI-EXAMPLES/` folder containing sanitized prompts and chosen outputs to make future audits faster.
-
-## Appendix: pointers (quick links)
-
-- Core service: `src/InventoryHold.Domain/Services/HoldService.cs`
-- Tests: `src/InventoryHold.UnitTests/HoldServiceTests.cs`
-- Web API: `src/InventoryHold.WebApi/Program.cs`
-- Caching implementations: `src/InventoryHold.Infrastructure/Caching/`
-
----
-Last updated: 2026-06-07 — edited for clarity and auditability.
